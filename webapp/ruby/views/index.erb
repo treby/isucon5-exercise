@@ -6,12 +6,12 @@
     <dl>
       <dt>アカウント名</dt><dd id="prof-account-name"><%= @user[:account_name] %></dd>
       <dt>メールアドレス</dt><dd id="prof-email"><%= @user[:email] %></dd>
-      <dt>姓</dt><dd id="prof-last-name"><%= profile[:last_name] || '未入力' %></dd>
-      <dt>名</dt><dd id="prof-first-name"><%= profile[:first_name] || '未入力' %></dd>
-      <dt>性別</dt><dd id="prof-sex"><%= profile[:sex] || '未入力' %></dd>
-      <dt>誕生日</dt><dd id="prof-birthday"><%= profile[:birthday] || '未入力' %></dd>
-      <dt>住んでいる県</dt><dd id="prof-pref"><%= profile[:pref] || '未入力' %></dd>
-      <dt>友だちの人数</dt><dd id="prof-friends"><a href="/friends"><%= friends.size %>人</a></dd>
+      <dt>姓</dt><dd id="prof-last-name"><%= @user[:last_name] || '未入力' %></dd>
+      <dt>名</dt><dd id="prof-first-name"><%= @user[:first_name] || '未入力' %></dd>
+      <dt>性別</dt><dd id="prof-sex"><%= @user[:sex] || '未入力' %></dd>
+      <dt>誕生日</dt><dd id="prof-birthday"><%= @user[:birthday] || '未入力' %></dd>
+      <dt>住んでいる県</dt><dd id="prof-pref"><%= @user[:pref] || '未入力' %></dd>
+      <dt>友だちの人数</dt><dd id="prof-friends"><a href="/friends"><%= friend_count %>人</a></dd>
     </dl>
   </div>
   <div class="col-md-4">
@@ -19,7 +19,7 @@
     <div id="entries">
       <ul class="list-group">
         <% entries.each do |entry| %>
-        <li class="list-group-item entries-entry"><a href="/diary/entry/<%= entry[:id] %>"><%= entry[:body].split(/\n/).first %></a></li>
+          <li class="list-group-item entries-entry"><a href="/diary/entry/<%= entry[:id] %>"><%= entry[:title] %></a></li>
         <% end %>
       </ul>
     </div>
@@ -30,9 +30,7 @@
     <div id="footprints">
       <ul class="list-group">
         <% footprints.each do |fp| %>
-        <!-- IDEA: get_userが毎回クエリ発行するようであれば、キャッシュするかapp.rbでインスタンス変数化して利用する -->
-        <% owner = get_user(fp[:owner_id]) %>
-        <li class="list-group-item footprints-footprint"><%= fp[:updated] %>: <a href="/profile/<%= owner[:account_name] %>"><%= owner[:nick_name] %>さん</a>
+          <li class="list-group-item footprints-footprint"><%= fp[:updated] %>: <a href="/profile/<%= fp[:account_name] %>"><%= fp[:nick_name] %>さん</a>
         <% end %>
       </ul>
     </div>
@@ -44,15 +42,13 @@
   <div>あなたへのコメント</div>
   <div id="comments">
     <% comments_for_me.each do |comment| %>
-    <div class="comments-comment">
-      <ul class="list-group">
-      <!-- IDEA: get_userが毎回クエリ発行するようであれば、キャッシュするかapp.rbでインスタンス変数化して利用する -->
-        <% comment_user = get_user(comment[:user_id]) %>
-        <li class="list-group-item comment-owner"><a href="/profile/<%= comment_user[:account_name] %>"><%= comment_user[:nick_name] %>さん</a>:
-        <li class="list-group-item comment-comment"><%= comment[:comment].size > 30 ? comment[:comment][0...27] + '...' : comment[:comment] %>
-        <li class="list-group-item comment-created-at">投稿時刻:<%= comment[:created_at] %>
-      </ul>
-    </div>
+      <div class="comments-comment">
+        <ul class="list-group">
+          <li class="list-group-item comment-owner"><a href="/profile/<%= comment[:account_name] %>"><%= comment[:nick_name] %>さん</a>:
+          <li class="list-group-item comment-comment"><%= comment[:comment].size > 30 ? comment[:comment][0...27] + '...' : comment[:comment] %>
+          <li class="list-group-item comment-created-at">投稿時刻:<%= comment[:created_at] %>
+        </ul>
+      </div>
     <% end %>
   </div>
 </div>
@@ -61,15 +57,13 @@
   <div>あなたの友だちの日記エントリ</div>
   <div id="friend-entries">
     <% entries_of_friends.each do |entry| %>
-    <div class="friend-entry">
-      <ul class="list-group">
-      <!-- IDEA: get_userが毎回クエリ発行するようであれば、キャッシュするかapp.rbでインスタンス変数化して利用する -->
-        <% entry_owner = get_user(entry[:user_id]) %>
-        <li class="list-group-item entry-owner"><a href="/diary/entries/<%= entry_owner[:account_name] %>"><%= entry_owner[:nick_name] %>さん</a>:
-        <li class="list-group-item entry-title"><a href="/diary/entry/<%= entry[:id] %>"><%= entry[:body].split(/\n/).first %></a>
-        <li class="list-group-item entry-created-at">投稿時刻:<%= entry[:created_at] %>
-      </ul>
-    </div>
+      <div class="friend-entry">
+        <ul class="list-group">
+          <li class="list-group-item entry-owner"><a href="/diary/entries/<%= entry[:account_name] %>"><%= entry[:nick_name] %>さん</a>:
+          <li class="list-group-item entry-title"><a href="/diary/entry/<%= entry[:id] %>"><%= entry[:title] %></a>
+          <li class="list-group-item entry-created-at">投稿時刻:<%= entry[:created_at] %>
+        </ul>
+      </div>
     <% end %>
   </div>
 </div>
@@ -80,15 +74,9 @@
     <% comments_of_friends.each do |comment| %>
     <div class="friend-comment">
       <ul class="list-group">
-        <!-- IDEA: get_userが毎回クエリ発行するようであれば、キャッシュするかapp.rbでインスタンス変数化して利用する -->
-        <% comment_owner = get_user(comment[:user_id]) %>
-        <!-- IDEA: テンプレート内でクエリするんじゃなくて、app.rbの中でJOINしたクエリでまとめてとってきてviewで利用するようにする-->
-        <% entry = db.xquery('SELECT * FROM entries WHERE id=?', comment[:entry_id]).first %>
-        <!-- IDEA: get_userが毎回クエリ発行するようであれば、キャッシュするかapp.rbでインスタンス変数化して利用する -->
-        <% entry_owner = get_user(entry[:user_id]) %>
         <li class="list-group-item comment-from-to">
-          <a href="/profile/<%= comment_owner[:account_name] %>"><%= comment_owner[:nick_name] %>さん</a>から
-          <a href="/profile/<%= entry_owner[:account_name] %>"><%= entry_owner[:nick_name] %>さん</a>へのコメント:
+          <a href="/profile/<%= comment[:comment_account_name] %>"><%= comment[:comment_nick_name] %>さん</a>から
+          <a href="/profile/<%= comment[:entry_account_name] %>"><%= comment[:entry_nick_name] %>さん</a>へのコメント:
         <li class="list-group-item comment-comment"><%= comment[:comment].size > 30 ? comment[:comment][0...27] + '...' : comment[:comment] %>
         <li class="list-group-item comment-created-at">投稿時刻:<%= comment[:created_at] %>
       </ul>

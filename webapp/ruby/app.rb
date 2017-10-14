@@ -86,9 +86,7 @@ SQL
       unless session[:user_id]
         return nil
       end
-      # IDEA: SELECTする絡むを減らす
-      # IDEA: LIMIT 1つける
-      @user = db.xquery('SELECT id, account_name, nick_name, email FROM users WHERE id=?', session[:user_id]).first
+      @user = get_user(id: session[:user_id])
       unless @user
         session[:user_id] = nil
         session.clear
@@ -103,20 +101,35 @@ SQL
       end
     end
 
-    def get_user(user_id)
-      # IDEA: 必要なカラムだけSELECTする
-      # IDEA: LIMITつける
-      user = db.xquery('SELECT * FROM users WHERE id = ?', user_id).first
+    def get_user(id: nil, account_name: '')
+      user = nil
+
+      if id
+        query = <<~SQL
+          SELECT
+          id, account_name, nick_name, email,
+          first_name, last_name, sex, birthday, pref
+          FROM users INNER JOIN profiles ON users.id = profiles.user_id
+          WHERE id=? LIMIT 1
+        SQL
+        user = db.xquery(query, id).first
+      else
+        query = <<~SQL
+          SELECT
+          id, account_name, nick_name, email,
+          first_name, last_name, sex, birthday, pref
+          FROM users INNER JOIN profiles ON users.id = profiles.user_id
+          WHERE account_name=? LIMIT 1
+        SQL
+        user = db.xquery(query, account_name).first
+      end
+
       raise Isucon5::ContentNotFound unless user
       user
     end
 
     def user_from_account(account_name)
-      # IDEA: 必要なカラムだけSELECTする
-      # IDEA: LIMITつける
-      user = db.xquery('SELECT * FROM users WHERE account_name = ?', account_name).first
-      raise Isucon5::ContentNotFound unless user
-      user
+      get_user(account_name: account_name)
     end
 
     def is_friend?(another_id)
@@ -185,72 +198,68 @@ SQL
 
   get '/' do
     authenticated!
-    # IDEA: 必要なカラムだけSELECTする
-    # IDEA: LIMITつける
-    profile = db.xquery('SELECT * FROM profiles WHERE user_id = ?', current_user[:id]).first
-
-    # IDEA: 必要なカラムだけSELECTする
-    entries_query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
+    entries_query = 'SELECT id, body FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
     entries = db.xquery(entries_query, current_user[:id])
       .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
 
-    # IDEA: entriesのJOIN必要？
-    comments_for_me_query = <<SQL
-SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
-FROM comments c
-JOIN entries e ON c.entry_id = e.id
-WHERE e.user_id = ?
-ORDER BY c.created_at DESC
-LIMIT 10
-SQL
+    comments_for_me_query = <<~SQL
+      SELECT c.comment AS comment, c.created_at AS created_at, account_name, nick_name
+      FROM comments AS c
+      INNER JOIN entries AS e ON e.id = c.entry_id
+      INNER JOIN users ON users.id = c.user_id
+      WHERE e.user_id = ?
+      ORDER BY c.created_at DESC
+      LIMIT 10
+    SQL
     comments_for_me = db.xquery(comments_for_me_query, current_user[:id])
 
-    entries_of_friends = []
-    # IDEA: 必要なカラムだけSELECTする
-    db.query('SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000').each do |entry|
-      next unless is_friend?(entry[:user_id])
-      entry[:title] = entry[:body].split(/\n/).first
-      entries_of_friends << entry
-      break if entries_of_friends.size >= 10
+    friend_ids = db.xquery('SELECT one, another FROM relations WHERE one = ? OR another = ?', current_user[:id], current_user[:id]).flat_map { |r| [r[:one].to_i, r[:another].to_i] }.uniq - [current_user[:id]]
+
+    entries_for_friends_query = <<~SQL
+      SELECT e.id, e.body, account_name, nick_name, e.created_at FROM entries AS e
+      INNER JOIN users ON e.user_id = users.id
+      WHERE e.user_id IN (?) ORDER BY created_at DESC LIMIT 10
+    SQL
+
+    entries_of_friends = db.xquery(entries_for_friends_query, friend_ids).each do |entry|
+      entry[:title] = entry[:body].split("\n").first
     end
 
-    comments_of_friends = []
-    # IDEA: 必要なカラムだけSELECTする
-    db.query('SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000').each do |comment|
-      next unless is_friend?(comment[:user_id])
-      entry = db.xquery('SELECT * FROM entries WHERE id = ?', comment[:entry_id]).first
-      entry[:is_private] = (entry[:private] == 1)
-      next if entry[:is_private] && !permitted?(entry[:user_id])
-      comments_of_friends << comment
-      break if comments_of_friends.size >= 10
-    end
+    comments_for_friends_query = <<~SQL
+      SELECT
+      c.comment,
+      users.account_name AS comment_account_name,
+      users.nick_name AS comment_nick_name,
+      xusers.account_name AS entry_account_name,
+      xusers.nick_name AS entry_nick_name,
+      e.user_id AS entry_user_id,
+      c.created_at
+      FROM comments AS c
+      INNER JOIN entries AS e ON e.id = c.entry_id AND (e.user_id IN (?) OR e.private = 0)
+      INNER JOIN users ON c.user_id = users.id
+      INNER JOIN users AS xusers ON e.user_id = xusers.id
+      WHERE c.user_id IN (?) ORDER BY c.created_at DESC LIMIT 10
+    SQL
+    comments_of_friends = db.xquery(comments_for_friends_query, friend_ids, friend_ids)
 
-    # IDEA: 必要なカラムだけSELECTする
-    friends_query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
-    friends_map = {}
-    db.xquery(friends_query, current_user[:id], current_user[:id]).each do |rel|
-      key = (rel[:one] == current_user[:id] ? :another : :one)
-      friends_map[rel[key]] ||= rel[:created_at]
-    end
-    friends = friends_map.map{|user_id, created_at| [user_id, created_at]}
-
-    query = <<SQL
-SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
-FROM footprints
-WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
-LIMIT 10
-SQL
+    query = <<~SQL
+      SELECT account_name, nick_name, DATE(f.created_at) AS date, MAX(f.created_at) AS updated
+      FROM footprints AS f
+      INNER JOIN users ON f.owner_id = users.id
+      INNER JOIN profiles ON users.id = profiles.user_id
+      WHERE f.user_id = ?
+      GROUP BY f.user_id, f.owner_id, DATE(created_at)
+      ORDER BY updated DESC
+      LIMIT 10
+    SQL
     footprints = db.xquery(query, current_user[:id])
 
     locals = {
-      profile: profile || {},
       entries: entries,
       comments_for_me: comments_for_me,
       entries_of_friends: entries_of_friends,
       comments_of_friends: comments_of_friends,
-      friends: friends,
+      friend_count: friend_ids.count,
       footprints: footprints
     }
     erb :index, locals: locals
@@ -331,7 +340,7 @@ SQL
     raise Isucon5::ContentNotFound unless entry
     entry[:title], entry[:content] = entry[:body].split(/\n/, 2)
     entry[:is_private] = (entry[:private] == 1)
-    owner = get_user(entry[:user_id])
+    owner = get_user(id: entry[:user_id])
     if entry[:is_private] && !permitted?(owner[:id])
       raise Isucon5::PermissionDenied
     end
