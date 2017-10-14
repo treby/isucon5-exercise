@@ -86,9 +86,7 @@ SQL
       unless session[:user_id]
         return nil
       end
-      # IDEA: SELECTする絡むを減らす
-      # IDEA: LIMIT 1つける
-      @user = db.xquery('SELECT id, account_name, nick_name, email FROM users WHERE id=?', session[:user_id]).first
+      @user = db.xquery('SELECT id, account_name, nick_name, email, first_name, last_name, sex, birthday, pref FROM users INNER JOIN profiles ON users.id = profiles.user_id WHERE id=? LIMIT 1', session[:user_id]).first
       unless @user
         session[:user_id] = nil
         session.clear
@@ -185,8 +183,6 @@ SQL
 
   get '/' do
     authenticated!
-    profile = db.xquery('SELECT last_name, first_name, sex, birthday, pref FROM profiles WHERE user_id = ? LIMIT 1', current_user[:id]).first
-
     entries_query = 'SELECT id, body FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
     entries = db.xquery(entries_query, current_user[:id])
       .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
@@ -196,7 +192,6 @@ SQL
       FROM comments AS c
       INNER JOIN entries AS e ON e.id = c.entry_id
       INNER JOIN users ON users.id = c.user_id
-      INNER JOIN profiles AS prof ON users.id = prof.user_id
       WHERE e.user_id = ?
       ORDER BY c.created_at DESC
       LIMIT 10
@@ -208,7 +203,6 @@ SQL
     entries_for_friends_query = <<~SQL
       SELECT e.id, e.body, account_name, nick_name, e.created_at FROM entries AS e
       INNER JOIN users ON e.user_id = users.id
-      INNER JOIN profiles ON profiles.user_id = users.id
       WHERE e.user_id IN (?) ORDER BY created_at DESC LIMIT 10
     SQL
 
@@ -246,7 +240,6 @@ SQL
     footprints = db.xquery(query, current_user[:id])
 
     locals = {
-      profile: profile || {},
       entries: entries,
       comments_for_me: comments_for_me,
       entries_of_friends: entries_of_friends,
