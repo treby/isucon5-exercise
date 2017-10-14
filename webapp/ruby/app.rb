@@ -272,10 +272,10 @@ SQL
     permitted = permitted?(owner[:id])
     query = if permitted
               # IDEA: 必要なカラムだけSELECTする
-              'SELECT body, created_at FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
+              'SELECT id, body, created_at FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
             else
               # IDEA: 必要なカラムだけSELECTする
-              'SELECT body, created_at FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5'
+              'SELECT id, body, created_at FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5'
             end
     entries = db.xquery(query, owner[:id])
       .map{ |entry| entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
@@ -331,7 +331,7 @@ SQL
   get '/diary/entry/:entry_id' do
     authenticated!
 
-    entry = db.xquery("SELECT entries.id, body, created_at, users.nick_name, users.account_name FROM entries INNER JOIN users WHERE entries.id = ? LIMIT 1", params[:entry_id]).first
+    entry = db.xquery("SELECT entries.id, body, created_at, users.nick_name, users.account_name FROM entries INNER JOIN users ON users.id = entries.user_id WHERE entries.id = ? LIMIT 1", params[:entry_id]).first
     raise Isucon5::ContentNotFound unless entry
     entry[:title], entry[:content] = entry[:body].split("\n", 2)
     if entry[:private] == 1 && !permitted?(current_user[:id])
