@@ -290,7 +290,7 @@ SQL
     end
     args = [params['first_name'], params['last_name'], params['sex'], params['birthday'], params['pref']]
 
-    prof = db.xquery('SELECT id FROM profiles WHERE user_id = ? LIMIT 1', current_user[:id]).first
+    prof = db.xquery('SELECT user_id FROM profiles WHERE user_id = ? LIMIT 1', current_user[:id]).first
     if prof
       query = <<SQL
 UPDATE profiles
