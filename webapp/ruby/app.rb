@@ -232,10 +232,12 @@ SQL
     friends = friends_map.map{|user_id, created_at| [user_id, created_at]}
 
     query = <<SQL
-SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
-FROM footprints
-WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
+SELECT account_name, nick_name, DATE(f.created_at) AS date, MAX(f.created_at) AS updated
+FROM footprints AS f
+INNER JOIN users ON f.owner_id = users.id
+INNER JOIN profiles ON users.id = profiles.user_id
+WHERE f.user_id = ?
+GROUP BY f.user_id, f.owner_id, DATE(created_at)
 ORDER BY updated DESC
 LIMIT 10
 SQL
