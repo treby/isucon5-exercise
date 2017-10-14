@@ -330,19 +330,24 @@ SQL
 
   get '/diary/entry/:entry_id' do
     authenticated!
-    # IDEA: 必要なカラムだけSELECTする
-    # IDEA: LIMIT 1つける
-    entry = db.xquery('SELECT * FROM entries WHERE id = ?', params['entry_id']).first
+
+    entry = db.xquery("SELECT entries.id, body, created_at, users.nick_name, users.account_name FROM entries INNER JOIN users WHERE entries.id = ? LIMIT 1", params[:entry_id]).first
     raise Isucon5::ContentNotFound unless entry
-    entry[:title], entry[:content] = entry[:body].split(/\n/, 2)
-    entry[:is_private] = (entry[:private] == 1)
-    owner = get_user(id: entry[:user_id])
-    if entry[:is_private] && !permitted?(owner[:id])
+    entry[:title], entry[:content] = entry[:body].split("\n", 2)
+    if entry[:private] == 1 && !permitted?(current_user[:id])
       raise Isucon5::PermissionDenied
     end
-    comments = db.xquery('SELECT * FROM comments WHERE entry_id = ?', entry[:id])
-    mark_footprint(owner[:id])
-    erb :entry, locals: { owner: owner, entry: entry, comments: comments }
+
+    query = <<SQL
+SELECT
+c.comment, c.created_at, users.account_name, users.nick_name
+FROM comments AS c
+INNER JOIN users ON users.id = c.user_id
+WHERE c.entry_id = ?
+SQL
+    entry_comments = db.xquery(query, entry[:id])
+    mark_footprint(current_user[:id])
+    erb :entry, locals: { entry: entry, comments: entry_comments }
   end
 
   post '/diary/entry' do
