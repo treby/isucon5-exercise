@@ -379,8 +379,9 @@ SQL
   get '/footprints' do
     authenticated!
     query = <<SQL
-SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) as updated
-FROM footprints
+SELECT user_id, nick_name, account_name, DATE(created_at) AS date, MAX(created_at) as updated
+FROM footprints AS fp
+INNER JOIN users ON fp.owner_id = users.id
 WHERE user_id = ?
 GROUP BY user_id, owner_id, DATE(created_at)
 ORDER BY updated DESC
