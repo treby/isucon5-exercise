@@ -4,6 +4,9 @@ require 'mysql2-cs-bind'
 require 'tilt/erubis'
 require 'erubis'
 
+require 'sinatra/reloader'
+require 'rack-mini-profiler'
+
 module Isucon5
   class AuthenticationError < StandardError; end
   class PermissionDenied < StandardError; end
@@ -18,6 +21,11 @@ module Isucon5
 end
 
 class Isucon5::WebApp < Sinatra::Base
+  configure :development do
+    register Sinatra::Reloader
+  end
+
+  use Rack::MiniProfiler
   use Rack::Session::Cookie
   # IDEA: escape_htmlとか重かったりしないだろうか
   set :erb, escape_html: true
