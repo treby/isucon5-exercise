@@ -23,9 +23,9 @@ end
 class Isucon5::WebApp < Sinatra::Base
   configure :development do
     register Sinatra::Reloader
+    use Rack::MiniProfiler
   end
 
-  use Rack::MiniProfiler
   use Rack::Session::Cookie
   # IDEA: escape_htmlとか重かったりしないだろうか
   set :erb, escape_html: true
