@@ -191,16 +191,16 @@ SQL
     entries = db.xquery(entries_query, current_user[:id])
       .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
 
-    comments_for_me_query = <<SQL
-SELECT c.comment AS comment, c.created_at AS created_at, account_name, nick_name
-FROM comments AS c
-INNER JOIN entries AS e ON e.id = c.entry_id
-INNER JOIN users ON users.id = c.user_id
-INNER JOIN profiles AS prof ON users.id = prof.user_id
-WHERE e.user_id = ?
-ORDER BY c.created_at DESC
-LIMIT 10
-SQL
+    comments_for_me_query = <<~SQL
+      SELECT c.comment AS comment, c.created_at AS created_at, account_name, nick_name
+      FROM comments AS c
+      INNER JOIN entries AS e ON e.id = c.entry_id
+      INNER JOIN users ON users.id = c.user_id
+      INNER JOIN profiles AS prof ON users.id = prof.user_id
+      WHERE e.user_id = ?
+      ORDER BY c.created_at DESC
+      LIMIT 10
+    SQL
     comments_for_me = db.xquery(comments_for_me_query, current_user[:id])
 
     friend_ids = db.xquery('SELECT one, another FROM relations WHERE one = ? OR another = ?', current_user[:id], current_user[:id]).flat_map { |r| [r[:one].to_i, r[:another].to_i] }.uniq - [current_user[:id]]
@@ -231,16 +231,16 @@ SQL
     SQL
     comments_of_friends = db.xquery(comments_for_friends_query, friend_ids, friend_ids)
 
-    query = <<SQL
-SELECT account_name, nick_name, DATE(f.created_at) AS date, MAX(f.created_at) AS updated
-FROM footprints AS f
-INNER JOIN users ON f.owner_id = users.id
-INNER JOIN profiles ON users.id = profiles.user_id
-WHERE f.user_id = ?
-GROUP BY f.user_id, f.owner_id, DATE(created_at)
-ORDER BY updated DESC
-LIMIT 10
-SQL
+    query = <<~SQL
+      SELECT account_name, nick_name, DATE(f.created_at) AS date, MAX(f.created_at) AS updated
+      FROM footprints AS f
+      INNER JOIN users ON f.owner_id = users.id
+      INNER JOIN profiles ON users.id = profiles.user_id
+      WHERE f.user_id = ?
+      GROUP BY f.user_id, f.owner_id, DATE(created_at)
+      ORDER BY updated DESC
+      LIMIT 10
+    SQL
     footprints = db.xquery(query, current_user[:id])
 
     locals = {
