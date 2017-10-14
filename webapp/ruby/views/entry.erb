@@ -14,6 +14,7 @@
 <div class="row panel panel-primary" id="entry-comments">
   <% comments.each do |comment| %>
   <div class="comment">
+    <!-- IDEA: get_userが毎回クエリ発行するようであれば、キャッシュするかapp.rbでインスタンス変数化して利用する -->
     <% comment_user = get_user(comment[:user_id]) %>
     <div class="comment-owner"><a href="/profile/<%= comment_user[:account_name] %>"><%= comment_user[:nick_name] %>さん</a></div>
     <div class="comment-comment">
