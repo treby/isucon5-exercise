@@ -203,13 +203,17 @@ LIMIT 10
 SQL
     comments_for_me = db.xquery(comments_for_me_query, current_user[:id])
 
-    entries_of_friends = []
-    # IDEA: 必要なカラムだけSELECTする
-    db.query('SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000').each do |entry|
-      next unless is_friend?(entry[:user_id])
-      entry[:title] = entry[:body].split(/\n/).first
-      entries_of_friends << entry
-      break if entries_of_friends.size >= 10
+    friend_ids = db.xquery('SELECT one, another FROM relations WHERE one = ? OR another = ?', current_user[:id], current_user[:id]).flat_map { |r| [r[:one].to_i, r[:another].to_i] }.uniq - [current_user[:id]]
+
+    entries_for_friends_query = <<~SQL
+      SELECT e.id, e.body, account_name, nick_name, e.created_at FROM entries AS e
+      INNER JOIN users ON e.user_id = users.id
+      INNER JOIN profiles ON profiles.user_id = users.id
+      WHERE e.user_id IN (?) ORDER BY created_at DESC LIMIT 10
+    SQL
+
+    entries_of_friends = db.xquery(entries_for_friends_query, friend_ids).each do |entry|
+      entry[:title] = entry[:body].split("\n").first
     end
 
     comments_of_friends = []
