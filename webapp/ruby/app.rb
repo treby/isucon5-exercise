@@ -391,16 +391,16 @@ SQL
 
   get '/friends' do
     authenticated!
-    # IDEA: 必要なカラムだけSELECTする
-    # IDEA: LIMITつける
-    # IDEA: created_atのorder by必要なければ消す、あるいはrubyでorderingする
-    query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
-    friends = {}
-    db.xquery(query, current_user[:id], current_user[:id]).each do |rel|
-      key = (rel[:one] == current_user[:id] ? :another : :one)
-      friends[rel[key]] ||= rel[:created_at]
-    end
-    list = friends.map{|user_id, created_at| [user_id, created_at]}
+    query = <<SQL
+SELECT rel.created_at,
+users.account_name,
+users.nick_name
+FROM relations AS rel
+LEFT JOIN users ON rel.another = users.id
+WHERE one = ? ORDER BY created_at DESC
+SQL
+
+    list = db.xquery(query, current_user[:id])
     erb :friends, locals: { friends: list }
   end
 
