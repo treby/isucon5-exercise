@@ -219,14 +219,16 @@ SQL
     comments_for_friends_query = <<~SQL
       SELECT
       c.comment,
-      account_name,
-      nick_name,
+      users.account_name AS comment_account_name,
+      users.nick_name AS comment_nick_name,
+      xusers.account_name AS entry_account_name,
+      xusers.nick_name AS entry_nick_name,
       e.user_id AS entry_user_id,
       c.created_at
       FROM comments AS c
       INNER JOIN entries AS e ON e.id = c.entry_id AND (e.user_id IN (?) OR e.private = 0)
       INNER JOIN users ON c.user_id = users.id
-      INNER JOIN profiles AS prof ON prof.user_id = users.id
+      INNER JOIN users AS xusers ON e.user_id = xusers.id
       WHERE c.user_id IN (?) ORDER BY c.created_at DESC LIMIT 10
     SQL
     comments_of_friends = db.xquery(comments_for_friends_query, friend_ids, friend_ids)
