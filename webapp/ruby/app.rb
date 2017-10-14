@@ -185,12 +185,9 @@ SQL
 
   get '/' do
     authenticated!
-    # IDEA: 必要なカラムだけSELECTする
-    # IDEA: LIMITつける
-    profile = db.xquery('SELECT * FROM profiles WHERE user_id = ?', current_user[:id]).first
+    profile = db.xquery('SELECT last_name, first_name, sex, birthday, pref FROM profiles WHERE user_id = ? LIMIT 1', current_user[:id]).first
 
-    # IDEA: 必要なカラムだけSELECTする
-    entries_query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
+    entries_query = 'SELECT id, body FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
     entries = db.xquery(entries_query, current_user[:id])
       .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
 
