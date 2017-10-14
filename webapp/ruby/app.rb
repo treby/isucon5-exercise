@@ -208,7 +208,7 @@ SQL
       INNER JOIN entries AS e ON e.id = c.entry_id
       INNER JOIN users ON users.id = c.user_id
       WHERE e.user_id = ?
-      ORDER BY c.created_at DESC
+      ORDER BY c.id DESC
       LIMIT 10
     SQL
     comments_for_me = db.xquery(comments_for_me_query, current_user[:id])
@@ -218,7 +218,7 @@ SQL
     entries_for_friends_query = <<~SQL
       SELECT e.id, e.body, account_name, nick_name, e.created_at FROM entries AS e
       INNER JOIN users ON e.user_id = users.id
-      WHERE e.user_id IN (?) ORDER BY created_at DESC LIMIT 10
+      WHERE users.id IN (?) ORDER BY e.id DESC LIMIT 10
     SQL
 
     entries_of_friends = db.xquery(entries_for_friends_query, friend_ids).each do |entry|
