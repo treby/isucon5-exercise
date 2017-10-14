@@ -22,6 +22,7 @@ end
 
 class Isucon5::WebApp < Sinatra::Base
   configure :development do
+    require 'pry'
     register Sinatra::Reloader
     use Rack::MiniProfiler
   end
