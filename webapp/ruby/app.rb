@@ -191,11 +191,12 @@ SQL
     entries = db.xquery(entries_query, current_user[:id])
       .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
 
-    # IDEA: entriesのJOIN必要？
     comments_for_me_query = <<SQL
-SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
-FROM comments c
-JOIN entries e ON c.entry_id = e.id
+SELECT c.comment AS comment, c.created_at AS created_at, account_name, nick_name
+FROM comments AS c
+INNER JOIN entries AS e ON e.id = c.entry_id
+INNER JOIN users ON users.id = c.user_id
+INNER JOIN profiles AS prof ON users.id = prof.user_id
 WHERE e.user_id = ?
 ORDER BY c.created_at DESC
 LIMIT 10
