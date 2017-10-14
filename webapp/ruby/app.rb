@@ -267,22 +267,20 @@ SQL
 
   get '/profile/:account_name' do
     authenticated!
-    owner = user_from_account(params['account_name'])
-    # IDEA: 必要なカラムだけSELECTする
-    # IDEA: LIMIT 1つける
-    prof = db.xquery('SELECT * FROM profiles WHERE user_id = ?', owner[:id]).first
+    owner = get_user(account_name: params['account_name'])
     prof = {} unless prof
-    query = if permitted?(owner[:id])
+    permitted = permitted?(owner[:id])
+    query = if permitted
               # IDEA: 必要なカラムだけSELECTする
-              'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
+              'SELECT body, created_at FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
             else
               # IDEA: 必要なカラムだけSELECTする
-              'SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5'
+              'SELECT body, created_at FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5'
             end
     entries = db.xquery(query, owner[:id])
-      .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
+      .map{ |entry| entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
     mark_footprint(owner[:id])
-    erb :profile, locals: { owner: owner, profile: prof, entries: entries, private: permitted?(owner[:id]) }
+    erb :profile, locals: { owner: owner, profile: prof, entries: entries, permitted: permitted }
   end
 
   post '/profile/:account_name' do
@@ -292,9 +290,7 @@ SQL
     end
     args = [params['first_name'], params['last_name'], params['sex'], params['birthday'], params['pref']]
 
-    # IDEA: 必要なカラムだけSELECTする
-    # IDEA: LIMIT 1つける
-    prof = db.xquery('SELECT * FROM profiles WHERE user_id = ?', current_user[:id]).first
+    prof = db.xquery('SELECT id FROM profiles WHERE user_id = ? LIMIT 1', current_user[:id]).first
     if prof
       query = <<SQL
 UPDATE profiles
