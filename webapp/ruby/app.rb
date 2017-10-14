@@ -86,7 +86,7 @@ SQL
       unless session[:user_id]
         return nil
       end
-      @user = db.xquery('SELECT id, account_name, nick_name, email, first_name, last_name, sex, birthday, pref FROM users INNER JOIN profiles ON users.id = profiles.user_id WHERE id=? LIMIT 1', session[:user_id]).first
+      @user = get_user(id: session[:user_id])
       unless @user
         session[:user_id] = nil
         session.clear
@@ -101,20 +101,35 @@ SQL
       end
     end
 
-    def get_user(user_id)
-      # IDEA: 必要なカラムだけSELECTする
-      # IDEA: LIMITつける
-      user = db.xquery('SELECT * FROM users WHERE id = ?', user_id).first
+    def get_user(id: nil, account_name: '')
+      user = nil
+
+      if id
+        query = <<~SQL
+          SELECT
+          id, account_name, nick_name, email,
+          first_name, last_name, sex, birthday, pref
+          FROM users INNER JOIN profiles ON users.id = profiles.user_id
+          WHERE id=? LIMIT 1
+        SQL
+        user = db.xquery(query, id).first
+      else
+        query = <<~SQL
+          SELECT
+          id, account_name, nick_name, email,
+          first_name, last_name, sex, birthday, pref
+          FROM users INNER JOIN profiles ON users.id = profiles.user_id
+          WHERE account_name=? LIMIT 1
+        SQL
+        user = db.xquery(query, account_name).first
+      end
+
       raise Isucon5::ContentNotFound unless user
       user
     end
 
     def user_from_account(account_name)
-      # IDEA: 必要なカラムだけSELECTする
-      # IDEA: LIMITつける
-      user = db.xquery('SELECT * FROM users WHERE account_name = ?', account_name).first
-      raise Isucon5::ContentNotFound unless user
-      user
+      get_user(account_name: account_name)
     end
 
     def is_friend?(another_id)
@@ -325,7 +340,7 @@ SQL
     raise Isucon5::ContentNotFound unless entry
     entry[:title], entry[:content] = entry[:body].split(/\n/, 2)
     entry[:is_private] = (entry[:private] == 1)
-    owner = get_user(entry[:user_id])
+    owner = get_user(id: entry[:user_id])
     if entry[:is_private] && !permitted?(owner[:id])
       raise Isucon5::PermissionDenied
     end
