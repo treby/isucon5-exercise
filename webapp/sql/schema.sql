@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS relations (
 ) DEFAULT CHARSET=utf8;
 
 -- DROP TABLE IF EXISTS profiles;
+-- IDEA: user_idをkeyにindexはる
 CREATE TABLE IF NOT EXISTS profiles (
   `user_id` int NOT NULL PRIMARY KEY,
   `first_name` varchar(64) NOT NULL,
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 ) DEFAULT CHARSET=utf8mb4;
 
 -- DROP TABLE IF EXISTS entries;
+-- IDEA: user_idをkeyにindexはる
 CREATE TABLE IF NOT EXISTS entries (
   `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `user_id` int NOT NULL,
@@ -45,6 +47,8 @@ CREATE TABLE IF NOT EXISTS entries (
 ) DEFAULT CHARSET=utf8mb4;
 
 -- DROP TABLE IF EXISTS comments;
+-- IDEA: entry_idとuser_idをkeyにindexはる
+-- IDEA: created_atとかでsortとかorder byされているようであれば、created_atをkeyにindexはる
 CREATE TABLE IF NOT EXISTS comments (
   `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `entry_id` int NOT NULL,

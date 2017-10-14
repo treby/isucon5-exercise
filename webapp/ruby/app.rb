@@ -72,6 +72,8 @@ SQL
       unless session[:user_id]
         return nil
       end
+      # IDEA: SELECTする絡むを減らす
+      # IDEA: LIMITつける
       @user = db.xquery('SELECT id, account_name, nick_name, email FROM users WHERE id=?', session[:user_id]).first
       unless @user
         session[:user_id] = nil
@@ -88,18 +90,23 @@ SQL
     end
 
     def get_user(user_id)
+      # IDEA: 必要なカラムだけSELECTする
+      # IDEA: LIMITつける
       user = db.xquery('SELECT * FROM users WHERE id = ?', user_id).first
       raise Isucon5::ContentNotFound unless user
       user
     end
 
     def user_from_account(account_name)
+      # IDEA: 必要なカラムだけSELECTする
+      # IDEA: LIMITつける
       user = db.xquery('SELECT * FROM users WHERE account_name = ?', account_name).first
       raise Isucon5::ContentNotFound unless user
       user
     end
 
     def is_friend?(another_id)
+      # IDEA: 計算結果をメモ化
       user_id = session[:user_id]
       query = 'SELECT COUNT(1) AS cnt FROM relations WHERE (one = ? AND another = ?) OR (one = ? AND another = ?)'
       cnt = db.xquery(query, user_id, another_id, another_id, user_id).first[:cnt]
@@ -121,6 +128,7 @@ SQL
       end
     end
 
+    # IDEA: 文字列の定数化
     PREFS = %w(
       未入力
       北海道 青森県 岩手県 宮城県 秋田県 山形県 福島県 茨城県 栃木県 群馬県 埼玉県 千葉県 東京都 神奈川県 新潟県 富山県
@@ -163,13 +171,16 @@ SQL
 
   get '/' do
     authenticated!
-
+    # IDEA: 必要なカラムだけSELECTする
+    # IDEA: LIMITつける
     profile = db.xquery('SELECT * FROM profiles WHERE user_id = ?', current_user[:id]).first
 
+    # IDEA: 必要なカラムだけSELECTする
     entries_query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
     entries = db.xquery(entries_query, current_user[:id])
       .map{ |entry| entry[:is_private] = (entry[:private] == 1); entry[:title], entry[:content] = entry[:body].split(/\n/, 2); entry }
 
+    # IDEA: entriesのJOIN必要？
     comments_for_me_query = <<SQL
 SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
@@ -181,6 +192,7 @@ SQL
     comments_for_me = db.xquery(comments_for_me_query, current_user[:id])
 
     entries_of_friends = []
+    # IDEA: 必要なカラムだけSELECTする
     db.query('SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000').each do |entry|
       next unless is_friend?(entry[:user_id])
       entry[:title] = entry[:body].split(/\n/).first
@@ -189,6 +201,7 @@ SQL
     end
 
     comments_of_friends = []
+    # IDEA: 必要なカラムだけSELECTする
     db.query('SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000').each do |comment|
       next unless is_friend?(comment[:user_id])
       entry = db.xquery('SELECT * FROM entries WHERE id = ?', comment[:entry_id]).first
@@ -198,6 +211,7 @@ SQL
       break if comments_of_friends.size >= 10
     end
 
+    # IDEA: 必要なカラムだけSELECTする
     friends_query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
     friends_map = {}
     db.xquery(friends_query, current_user[:id], current_user[:id]).each do |rel|
@@ -231,11 +245,15 @@ SQL
   get '/profile/:account_name' do
     authenticated!
     owner = user_from_account(params['account_name'])
+    # IDEA: 必要なカラムだけSELECTする
+    # IDEA: LIMIT 1つける
     prof = db.xquery('SELECT * FROM profiles WHERE user_id = ?', owner[:id]).first
     prof = {} unless prof
     query = if permitted?(owner[:id])
+              # IDEA: 必要なカラムだけSELECTする
               'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5'
             else
+              # IDEA: 必要なカラムだけSELECTする
               'SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5'
             end
     entries = db.xquery(query, owner[:id])
@@ -251,6 +269,8 @@ SQL
     end
     args = [params['first_name'], params['last_name'], params['sex'], params['birthday'], params['pref']]
 
+    # IDEA: 必要なカラムだけSELECTする
+    # IDEA: LIMIT 1つける
     prof = db.xquery('SELECT * FROM profiles WHERE user_id = ?', current_user[:id]).first
     if prof
       query = <<SQL
@@ -273,8 +293,14 @@ SQL
     authenticated!
     owner = user_from_account(params['account_name'])
     query = if permitted?(owner[:id])
+              # IDEA: 必要なカラムだけSELECTする
+              # IDEA: LIMIT 20はなに？LIMIT 1で良い？
+              # IDEA: created_atのorder by必要なければ消す、あるいはrubyでorderingする
               'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at DESC LIMIT 20'
             else
+              # IDEA: 必要なカラムだけSELECTする
+              # IDEA: LIMIT 20はなに？LIMIT 1で良い？
+              # IDEA: created_atのorder by必要なければ消す、あるいはrubyでorderingする
               'SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at DESC LIMIT 20'
             end
     entries = db.xquery(query, owner[:id])
@@ -285,6 +311,8 @@ SQL
 
   get '/diary/entry/:entry_id' do
     authenticated!
+    # IDEA: 必要なカラムだけSELECTする
+    # IDEA: LIMIT 1つける
     entry = db.xquery('SELECT * FROM entries WHERE id = ?', params['entry_id']).first
     raise Isucon5::ContentNotFound unless entry
     entry[:title], entry[:content] = entry[:body].split(/\n/, 2)
@@ -308,6 +336,8 @@ SQL
 
   post '/diary/comment/:entry_id' do
     authenticated!
+    # IDEA: 必要なカラムだけSELECTする
+    # IDEA: LIMIT 1つける
     entry = db.xquery('SELECT * FROM entries WHERE id = ?', params['entry_id']).first
     unless entry
       raise Isucon5::ContentNotFound
@@ -337,6 +367,9 @@ SQL
 
   get '/friends' do
     authenticated!
+    # IDEA: 必要なカラムだけSELECTする
+    # IDEA: LIMITつける
+    # IDEA: created_atのorder by必要なければ消す、あるいはrubyでorderingする
     query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
     friends = {}
     db.xquery(query, current_user[:id], current_user[:id]).each do |rel|
