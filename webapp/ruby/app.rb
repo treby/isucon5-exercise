@@ -216,16 +216,20 @@ SQL
       entry[:title] = entry[:body].split("\n").first
     end
 
-    comments_of_friends = []
-    # IDEA: 必要なカラムだけSELECTする
-    db.query('SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000').each do |comment|
-      next unless is_friend?(comment[:user_id])
-      entry = db.xquery('SELECT * FROM entries WHERE id = ?', comment[:entry_id]).first
-      entry[:is_private] = (entry[:private] == 1)
-      next if entry[:is_private] && !permitted?(entry[:user_id])
-      comments_of_friends << comment
-      break if comments_of_friends.size >= 10
-    end
+    comments_for_friends_query = <<~SQL
+      SELECT
+      c.comment,
+      account_name,
+      nick_name,
+      e.user_id AS entry_user_id,
+      c.created_at
+      FROM comments AS c
+      INNER JOIN entries AS e ON e.id = c.entry_id AND (e.user_id IN (?) OR e.private = 0)
+      INNER JOIN users ON c.user_id = users.id
+      INNER JOIN profiles AS prof ON prof.user_id = users.id
+      WHERE c.user_id IN (?) ORDER BY c.created_at DESC LIMIT 10
+    SQL
+    comments_of_friends = db.xquery(comments_for_friends_query, friend_ids, friend_ids)
 
     # IDEA: 必要なカラムだけSELECTする
     friends_query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC'
