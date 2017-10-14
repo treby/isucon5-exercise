@@ -10,6 +10,7 @@ module Isucon5
   class ContentNotFound < StandardError; end
   module TimeWithoutZone
     def to_s
+      # IDEA: 文字列の定数化
       strftime("%F %H:%M:%S")
     end
   end
@@ -18,6 +19,7 @@ end
 
 class Isucon5::WebApp < Sinatra::Base
   use Rack::Session::Cookie
+  # IDEA: escape_htmlとか重かったりしないだろうか
   set :erb, escape_html: true
   set :public_folder, File.expand_path('../../static', __FILE__)
   #set :sessions, true
@@ -53,12 +55,16 @@ class Isucon5::WebApp < Sinatra::Base
     end
 
     def authenticate(email, password)
+      # IDEA: 毎回DBに問い合わせて認証するんじゃなくて、rubyでユーザーのハッシュマップをもって存在確認すればクエリ減らせて速くなるんじゃね？
+      # あるいはredisなどでオンメモリで持っておく
+      # IDEA: users.emailにindexはる？←適当
       query = <<SQL
 SELECT u.id AS id, u.account_name AS account_name, u.nick_name AS nick_name, u.email AS email
 FROM users u
 JOIN salts s ON u.id = s.user_id
 WHERE u.email = ? AND u.passhash = SHA2(CONCAT(?, s.salt), 512)
 SQL
+      # IDEA: db.xquery().firstしてるし、LIMIT 1にする
       result = db.xquery(query, email, password).first
       unless result
         raise Isucon5::AuthenticationError
@@ -73,7 +79,7 @@ SQL
         return nil
       end
       # IDEA: SELECTする絡むを減らす
-      # IDEA: LIMITつける
+      # IDEA: LIMIT 1つける
       @user = db.xquery('SELECT id, account_name, nick_name, email FROM users WHERE id=?', session[:user_id]).first
       unless @user
         session[:user_id] = nil

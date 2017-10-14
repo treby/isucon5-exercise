@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS salts (
 ) DEFAULT CHARSET=utf8;
 
 -- DROP TABLE IF EXISTS relations;
+-- IDEA: oneとanotherでuniqueになるしidいらなくね？
 CREATE TABLE IF NOT EXISTS relations (
   `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `one` int NOT NULL,
@@ -24,6 +25,8 @@ CREATE TABLE IF NOT EXISTS relations (
 
 -- DROP TABLE IF EXISTS profiles;
 -- IDEA: user_idをkeyにindexはる
+-- IDEA: profilesの中身をusersテーブルにくっつける
+-- IDEA: updated_atにindexはる
 CREATE TABLE IF NOT EXISTS profiles (
   `user_id` int NOT NULL PRIMARY KEY,
   `first_name` varchar(64) NOT NULL,
@@ -60,6 +63,7 @@ CREATE TABLE IF NOT EXISTS comments (
 ) DEFAULT CHARSET=utf8mb4;
 
 -- DROP TABLE IF EXISTS footprints;
+-- IDEA: created_atにindexはる
 CREATE TABLE IF NOT EXISTS footprints (
   `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `user_id` int NOT NULL,
